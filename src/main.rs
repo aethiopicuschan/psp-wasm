@@ -26,7 +26,7 @@ fn psp_main() {
 
     let engine = Engine::new(&config);
 
-    let wasm_binary: &'static [u8] = include_bytes!("../hello.wasm");
+    let wasm_binary: &'static [u8] = include_bytes!("../go/hello.wasm");
 
     let module = match Module::new(&engine, &wasm_binary[..]) {
         Ok(module) => module,
@@ -38,7 +38,7 @@ fn psp_main() {
 
     let mut store = Store::new(&engine, ());
 
-    let memory_type = match MemoryType::new(1, None) {
+    let memory_type = match MemoryType::new(10, Some(100)) {
         Ok(memory_type) => memory_type,
         Err(e) => {
             psp::dprintln!("Error: {:?}", e);
@@ -58,7 +58,13 @@ fn psp_main() {
         &mut store,
         move |caller: Caller<'_, ()>, ptr: MyI32, len: MyI32| {
             let memory = match caller.get_export("memory") {
-                Some(export) => export.into_memory().unwrap(),
+                Some(export) => match export.into_memory() {
+                    Some(memory) => memory,
+                    None => {
+                        psp::dprintln!("Error: Memory export is not a memory");
+                        return;
+                    }
+                },
                 None => {
                     psp::dprintln!("Error: Memory export not found");
                     return;
@@ -69,8 +75,11 @@ fn psp_main() {
     );
     let host_fd_write = Func::wrap(&mut store, functions::wasi::fd_write);
 
+    psp::dprintln!("到達点1");
+
     // リンカーを初期化し、関数を登録します。
-    let mut linker = Linker::<()>::new(&engine);
+    let mut linker = <Linker<()>>::new(&engine);
+    psp::dprintln!("到達点2");
     match linker.define("env", "memory", memory) {
         Ok(_) => {}
         Err(e) => {
@@ -92,6 +101,7 @@ fn psp_main() {
             return;
         }
     }
+    psp::dprintln!("到達点3");
     let pre_instance = match linker.instantiate(&mut store, &module) {
         Ok(pre_instance) => pre_instance,
         Err(e) => {
@@ -99,6 +109,7 @@ fn psp_main() {
             return;
         }
     };
+    psp::dprintln!("到達点4");
     let instance = match pre_instance.start(&mut store) {
         Ok(instance) => instance,
         Err(e) => {
@@ -106,6 +117,7 @@ fn psp_main() {
             return;
         }
     };
+    psp::dprintln!("到達点5");
     let start = match instance.get_typed_func::<(), ()>(&store, "_start") {
         Ok(start) => start,
         Err(e) => {
@@ -113,6 +125,7 @@ fn psp_main() {
             return;
         }
     };
+    psp::dprintln!("到達点6");
     match start.call(&mut store, ()) {
         Ok(_) => {}
         Err(e) => {
@@ -120,4 +133,6 @@ fn psp_main() {
             return;
         }
     }
+
+    psp::dprintln!("到達点7");
 }
