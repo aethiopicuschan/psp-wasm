@@ -1,9 +1,123 @@
 #![no_std]
 #![no_main]
 
+mod functions;
+mod types;
+
+use crate::types::MyI32;
+use wasmi::{Caller, Config, Engine, Func, Linker, Memory, MemoryType, Module, StackLimits, Store};
+
 psp::module!("sample_module", 1, 1);
 
 fn psp_main() {
+    // PSP特有の機能を有効にします。
     psp::enable_home_button();
-    psp::dprintln!("Hello PSP from rust!");
+
+    // ここからWASM関連
+    let mut config = Config::default();
+    let stack_limits = match StackLimits::new(256, 512, 128) {
+        Ok(stack_limits) => stack_limits,
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    };
+    config.set_stack_limits(stack_limits);
+
+    let engine = Engine::new(&config);
+
+    let wasm_binary: &'static [u8] = include_bytes!("../hello.wasm");
+
+    let module = match Module::new(&engine, &wasm_binary[..]) {
+        Ok(module) => module,
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    };
+
+    let mut store = Store::new(&engine, ());
+
+    let memory_type = match MemoryType::new(1, None) {
+        Ok(memory_type) => memory_type,
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    };
+    let memory = match Memory::new(&mut store, memory_type) {
+        Ok(memory) => memory,
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    };
+
+    // 関数のラップ
+    let host_println = Func::wrap(
+        &mut store,
+        move |caller: Caller<'_, ()>, ptr: MyI32, len: MyI32| {
+            let memory = match caller.get_export("memory") {
+                Some(export) => export.into_memory().unwrap(),
+                None => {
+                    psp::dprintln!("Error: Memory export not found");
+                    return;
+                }
+            };
+            functions::debug::println(caller, &memory, ptr, len);
+        },
+    );
+    let host_fd_write = Func::wrap(&mut store, functions::wasi::fd_write);
+
+    // リンカーを初期化し、関数を登録します。
+    let mut linker = Linker::<()>::new(&engine);
+    match linker.define("env", "memory", memory) {
+        Ok(_) => {}
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    }
+    match linker.define("debug", "println", host_println) {
+        Ok(_) => {}
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    }
+    match linker.define("wasi_snapshot_preview1", "fd_write", host_fd_write) {
+        Ok(_) => {}
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    }
+    let pre_instance = match linker.instantiate(&mut store, &module) {
+        Ok(pre_instance) => pre_instance,
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    };
+    let instance = match pre_instance.start(&mut store) {
+        Ok(instance) => instance,
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    };
+    let start = match instance.get_typed_func::<(), ()>(&store, "_start") {
+        Ok(start) => start,
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    };
+    match start.call(&mut store, ()) {
+        Ok(_) => {}
+        Err(e) => {
+            psp::dprintln!("Error: {:?}", e);
+            return;
+        }
+    }
 }
