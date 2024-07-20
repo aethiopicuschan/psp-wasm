@@ -2,7 +2,6 @@
 #![no_main]
 
 mod functions;
-mod types;
 
 use wasmi::{Caller, Config, Engine, Func, Linker, Memory, MemoryType, Module, StackLimits, Store};
 
