@@ -105,7 +105,7 @@ fn inner_main() {
         }
     };
     psp::dprintln!("到達点4");
-    let instance = match pre_instance.start(&mut store) {
+    let instance = match pre_instance.ensure_no_start(&mut store) {
         Ok(instance) => instance,
         Err(e) => {
             psp::dprintln!("Error: {:?}", e);
