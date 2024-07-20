@@ -8,7 +8,6 @@ use wasmi::{Caller, Config, Engine, Func, Linker, Memory, MemoryType, Module, St
 psp::module!("sample_module", 1, 1);
 
 fn inner_main() {
-    // ここからWASM関連
     let mut config = Config::default();
     let stack_limits = match StackLimits::new(256, 512, 128) {
         Ok(stack_limits) => stack_limits,
@@ -48,7 +47,6 @@ fn inner_main() {
         }
     };
 
-    // 関数のラップ
     let host_println = Func::wrap(
         &mut store,
         move |caller: Caller<'_, ()>, ptr: i32, len: i32| {
@@ -70,11 +68,7 @@ fn inner_main() {
     );
     let host_fd_write = Func::wrap(&mut store, functions::wasi::fd_write);
 
-    psp::dprintln!("到達点1");
-
-    // リンカーを初期化し、関数を登録します。
     let mut linker = <Linker<()>>::new(&engine);
-    psp::dprintln!("到達点2");
     match linker.define("env", "memory", memory) {
         Ok(_) => {}
         Err(e) => {
@@ -96,7 +90,6 @@ fn inner_main() {
             return;
         }
     }
-    psp::dprintln!("到達点3");
     let pre_instance = match linker.instantiate(&mut store, &module) {
         Ok(pre_instance) => pre_instance,
         Err(e) => {
@@ -104,7 +97,6 @@ fn inner_main() {
             return;
         }
     };
-    psp::dprintln!("到達点4");
     let instance = match pre_instance.ensure_no_start(&mut store) {
         Ok(instance) => instance,
         Err(e) => {
@@ -112,7 +104,6 @@ fn inner_main() {
             return;
         }
     };
-    psp::dprintln!("到達点5");
     let start = match instance.get_typed_func::<(), ()>(&store, "_start") {
         Ok(start) => start,
         Err(e) => {
@@ -120,7 +111,6 @@ fn inner_main() {
             return;
         }
     };
-    psp::dprintln!("到達点6");
     match start.call(&mut store, ()) {
         Ok(_) => {}
         Err(e) => {
@@ -128,8 +118,6 @@ fn inner_main() {
             return;
         }
     }
-
-    psp::dprintln!("到達点7");
 }
 
 fn psp_main() {
