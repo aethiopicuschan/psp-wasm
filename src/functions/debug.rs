@@ -1,13 +1,12 @@
 extern crate alloc;
-use crate::types::MyI32;
 use alloc::vec::Vec;
 use wasmi::{Caller, Memory};
 
 // デバッグ用の関数。文字列を出力する。
-pub fn println(caller: Caller<'_, ()>, memory: &Memory, ptr: MyI32, len: MyI32) {
+pub fn println(caller: Caller<'_, ()>, memory: &Memory, ptr: i32, len: i32) {
     // WASMのメモリ空間から文字列を取得する
-    let ptr = ptr.0 as usize;
-    let len = len.0 as usize;
+    let ptr = ptr as usize;
+    let len = len as usize;
     let mut buf = Vec::with_capacity(len);
     unsafe {
         buf.set_len(len);

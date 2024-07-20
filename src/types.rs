@@ -1,3 +1,4 @@
+/*
 use wasmi::{
     core::{UntypedValue, ValueType},
     WasmType,
@@ -42,3 +43,4 @@ impl Into<UntypedValue> for MyI32 {
         UntypedValue::from(self.0)
     }
 }
+ */

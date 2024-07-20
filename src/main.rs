@@ -4,15 +4,11 @@
 mod functions;
 mod types;
 
-use crate::types::MyI32;
 use wasmi::{Caller, Config, Engine, Func, Linker, Memory, MemoryType, Module, StackLimits, Store};
 
 psp::module!("sample_module", 1, 1);
 
-fn psp_main() {
-    // PSP特有の機能を有効にします。
-    psp::enable_home_button();
-
+fn inner_main() {
     // ここからWASM関連
     let mut config = Config::default();
     let stack_limits = match StackLimits::new(256, 512, 128) {
@@ -38,7 +34,7 @@ fn psp_main() {
 
     let mut store = Store::new(&engine, ());
 
-    let memory_type = match MemoryType::new(10, Some(100)) {
+    let memory_type = match MemoryType::new(1, Some(10)) {
         Ok(memory_type) => memory_type,
         Err(e) => {
             psp::dprintln!("Error: {:?}", e);
@@ -56,7 +52,7 @@ fn psp_main() {
     // 関数のラップ
     let host_println = Func::wrap(
         &mut store,
-        move |caller: Caller<'_, ()>, ptr: MyI32, len: MyI32| {
+        move |caller: Caller<'_, ()>, ptr: i32, len: i32| {
             let memory = match caller.get_export("memory") {
                 Some(export) => match export.into_memory() {
                     Some(memory) => memory,
@@ -135,4 +131,14 @@ fn psp_main() {
     }
 
     psp::dprintln!("到達点7");
+}
+
+fn psp_main() {
+    // PSP特有の機能を有効にします。
+    psp::enable_home_button();
+    if let Err(e) = psp::catch_unwind(|| {
+        inner_main();
+    }) {
+        psp::dprintln!("Error: {:?}", e);
+    }
 }
